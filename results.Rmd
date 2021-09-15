@@ -17,13 +17,6 @@ data_ex1 <- read_excel("data/cities_data.xlsx")
 head(data_ex1)
 ```
 
-## Converting explanatory variables into factors
-```{r}
-#data_ex1$Children=as.factor(data_ex1$Children)
-#data_ex1$Elderly=as.factor(data_ex1$Elderly)
-#data_ex1$Worker=as.factor(data_ex1$Worker)
-```
-
 
 # --------------------- Section A -----------------------------
 
@@ -45,11 +38,13 @@ fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
 ```
 
 ```{r}
-select(data_ex1, -c("LN_INC", "LN_VKMS"))  %>% cor()
+cor(data_ex1)
 ```
 We note variables that are highly correlated with VKMS:
 
 **Children, Car, HHIncome, Elderly, RoadDens, TransSup** and **Worker**
+
+
 
 ```{r}
 aov.out <- aov(VKMS ~ ., data=data_ex1)
@@ -64,71 +59,82 @@ We note that there is evidence for all variables except for **City** and **CityS
 First we construct a linear regression model, using all the socio-economic variables that showed correlation with VKMS in the correlation-matrix above, and statistical significance in the ANOVA-test. 
 
 ```{r}
+data_ex1$Children=as.factor(data_ex1$Children)
 model_b <- lm(VKMS ~ Children + Car + HHIncome + Elderly + RoadDens + Worker, data = data_ex1)
 summary(model_b)
 ```
+# Irene
 
- $R^2 = 0.5366$ & $F = 881.2$
+```{r}
+data_ex1$Children_1 <- ifelse(data_ex1$Children == "1", 1, 0)
+data_ex1$Children_2 <- ifelse(data_ex1$Children == "2", 1, 0)
+data_ex1$Children_3_or_more <- ifelse(data_ex1$Children == "4", 1, ifelse(data_ex1$Children == "3",1,ifelse(data_ex1$Children == "5",1,0)))
+model_b <- lm(VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + Elderly + RoadDens + Worker, data = data_ex1)
+summary(model_b)
+```
+# Irene
+
+
+```{r}
+model_b_1 <- lm(VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + RoadDens + Worker, data = data_ex1)
+summary(model_b)
+```
+
+ $R^2 = 0.5377$ & $F = 664.1$
 
 
 We see that the Elderly variable has no statistically significant effect on the response-variable, so we decide to remove this variable.
 
 ```{r}
-model_b <- lm(VKMS ~ Children + Car + HHIncome + RoadDens + Worker, data = data_ex1)
+model_b <- lm(VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + RoadDens + Worker, data = data_ex1)
 summary(model_b)
 ```
- $R^2 = 0.5367$ and $F = 1058$
+ $R^2 = 0.5378$ and $F = 759.1$
 
 The result is practically no change in $R^2$. Adding variables can only increase the $R^2$ or have it remain unchanged. Usually, when the $R^2$ is identical, we prefer the simpler model. This "simplicity" or scarcity of variables is reflected in the F-score, in our case we see that the F-score has increased, by dropping the Elderly variable, indicating that this variable was not doing much to explain the variations of our response-variable VKMS.
 
 
 We can also try to change our predictor variable into annual vehicle kilometers(VKMS) per car, by divding the two, and then constructing a model that predicts this new composite variable.
 ```{r}
-km_per_car_model <- lm(VKMS/Car ~ Children + HHIncome + RoadDens + Worker, data = data_ex1)
+km_per_car_model <- lm(VKMS/Car ~ Children_1 + Children_2 + Children_3_or_more + HHIncome + RoadDens + Worker, data = data_ex1)
 summary(km_per_car_model)
 ```
 $R^2 = 0.4409$ and $F = 900$
 
 Both model metrics have been significantly reduced. Number of cars seems to be more useful to our purpose as a predictor, than as a composite of the response.
 
-$\color{red}{\text{If I look at the output of the models below, I don't see the model with the children dummy variables being better?}}$
-
-Since results are similar in 3,4 and 5 childrens, then we create dummies variables.
-There should be a reference level
-
-
-```{r}
-data_ex1$Children_1 <- ifelse(data_ex1$Children == "1", 1, 0)
-data_ex1$Children_2 <- ifelse(data_ex1$Children == "2", 1, 0)
-data_ex1$Children_3_or_more <- ifelse(data_ex1$Children == "4", 1, ifelse(data_ex1$Children == "3",1,ifelse(data_ex1$Children == "5",1,0)))
-```
-
-
-```{r}
-model_b_dummy_children=lm(VKMS~ Car + HHIncome + RoadDens  + Children_1 + Children_2 + Children_3_or_more + Worker,data = data_ex1)
-summary(model_b_dummy_children)
-```
- $R^2 = 0.5378$ and $F = 759.1$
  
 We also have logarithmic transformations of the variables. We can try to use the natural logarithm of VKMS as our response variable, and we can include the natural logarithm of income as a predictor.
 
 First we construct a model including all variables
 
 ```{r}
-model_ln_b <- lm(LN_VKMS ~ Children + Car + HHIncome + LN_INC + Elderly + RoadDens + Worker, data = data_ex1)
+model_ln_b <- lm(LN_VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + LN_INC + Elderly + RoadDens + Worker, data = data_ex1)
 summary(model_ln_b)
 ```
- $R^2 = 0.6$ and $F = 978.5$
+ $R^2 = 0.6008$ and $F = 763.9$
  
- This model is better at explaining the variation than previous models. We see again that Elderly is the least significant variable, so we try to remove it.
+The R-squared is immediately higher than the purely linear models.
+ 
+Now we would like to see if we can simplify the model, without loosing its power. First, we remove the linear *HHIncome* variable, because it is so highly correlated with *LN_INC*
 
 ```{r}
-model_ln_b <- lm(LN_VKMS ~ Children + Car + HHIncome + LN_INC + RoadDens + Worker, data = data_ex1)
+model_ln_b <- lm(LN_VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + LN_INC + RoadDens + Worker + Elderly, data = data_ex1)
 summary(model_ln_b)
 ```
- $R^2 = 0.6$ and $F = 1141$
+ $R^2 = 0.6002$ and $F = 856.8$
  
-$R^2$ remains unchanged from removing the elderly variable. In our model, whether or not the household has any elderly people was not explaining any of the variation, so the $R^2$ value remains unchanged, while the F-score increases. Generally speaking, we would prefer this model over the other one.
+The model has lost a negligible amount of $R^2$, but the F-score has improved. It seems that the logarithmic income variable is sufficient in explaining the variation
+ 
+We see also that two variables are not statistically significant even below the 0.1 level. If we look at the correlation-matrix, we see that *Elderly* are highly negatively correlated with *Worker*. Which makes sense, logically speaking, as some degree of elders may be retired. We choose to keep the *Worker* variable, as it covers a wider range of people.
+
+```{r}
+model_ln_b <- lm(LN_VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + LN_INC + RoadDens + Worker, data = data_ex1)
+summary(model_ln_b)
+```
+ $R^2 = 0.6008$ and $F = 859.2$
+ 
+$R^2$ remains practically unchanged from removing the elderly variable, but the F-score has improved. Now we can assign additional levels of variation to be explained by the *Worker* variable, because we have removed the colinearity effect of the *Worker* and *Elderly* variables, explaining the same variation. *Worker* is sufficiently explaining the variation that we had assigned to *Elderly* in the previous model.
 
 # --------------------- Section C -----------------------------
 *Add the supply and city variables to the model and redo the estimation. Discuss the results.*
@@ -136,37 +142,38 @@ $R^2$ remains unchanged from removing the elderly variable. In our model, whethe
 Now we add the TransSup and city variables
 
 ```{r}
-model_c <- lm(VKMS ~ Children + Car + HHIncome + RoadDens + TransSup + Worker + City + CityShape, data = data_ex1)
+model_c <- lm(VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + RoadDens + TransSup + Worker + City + CityShape, data = data_ex1)
 summary(model_c)
 ```
-$R^2 = 0.5782$ and $F = 782.5$
+$R^2 = 0.5794$ and $F = 629.4$
 
 Immediately we see an increase in $R^2$, pointing towards some of the variables being able to explain additional sources of variations.
 We note that the City variable seems not to be a statistically significant predictor for the response-variable VKMS. If we try to remove it:
 
 ```{r}
-model_c <- lm(VKMS ~ Children + Car + HHIncome + RoadDens + TransSup + Worker + CityShape, data = data_ex1)
+model_c <- lm(VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + RoadDens + TransSup + Worker + CityShape, data = data_ex1)
 summary(model_c)
 ```
-$R^2 = 0.5782$ and $F = 894.3$
+$R^2 = 0.5795$ and $F = 699.3$
 
 The $R^2$ value is unchanged, while the F-score increases. Using the same rationale as previously, we would prefer the simpler model.
 
-And again, we can also include the logarithmic transformed variables
+And again, we can also infer the logarithmic model
 
 ```{r}
-model_ln_c <- lm(LN_VKMS ~ ., data=data_ex1)
+model_ln_c <- lm(LN_VKMS ~ LN_INC + Elderly + Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + RoadDens + TransSup + Worker + CityShape, data=data_ex1)
 summary(model_ln_c)
 ```
-The $R^2$ and F-score here is deceptive, as we have VKMS included as an explanatory variable for LN_VKMS.
+$R^2 = 0.6499$ and $F = 770.7$
 
-So, we remove the variables that shows no statistically significant effect above the 0.05-level on the response-variable.
+
+Again, we remove the variables that can eliminate the main colinearity effects, *Elderly* and *HHIncome*
 
 ```{r}
-model_ln_c <- lm(LN_VKMS ~ Car + HHIncome + RoadDens + Children + Worker + LN_INC + TransSup + CityShape, data=data_ex1)
+model_ln_c <- lm(LN_VKMS ~ Car + RoadDens + Children_1 + Children_2 + Children_3_or_more + Worker + LN_INC + TransSup + CityShape, data=data_ex1)
 summary(model_ln_c)
 ```
-$R^2 = 0.6489$ and $F = 1055$
+$R^2 = 0.6494$ and $F = 939.5$
 
 Going purely from $R^2$ and F-score, this is our best model so far
 
@@ -215,16 +222,10 @@ var.test(model_ln_b, model_ln_c, alternative = "two.sided")
 *H1: Variances are unequal -> Ratio of variances is different from 1*
 Results: true ratio of variances is not equal to 1, p-value < 2.2e-16 (95%)
 
-OUR BEST MODEL IS Model_ln_c
+OUR BEST MODEL IS model_ln_c
 # --------------------- Section E -----------------------------
 *Calculate the average elasticity of VKMS with respect to household income and mass transit supply. Interpret the elasticity that you find.*
 
-$\color{red}{\text{Here I am getting some different elasticities from yours, in both models}}$
-
-```{r}
-Elasticity_HHIncome= 6.6552*data_ex1$HHIncome/(-9562.1497 + 5406.8619*data_ex1$Car + 6.6552*data_ex1$HHIncome + 24083.2327*data_ex1$RoadDens + 1466.2595*data_ex1$   Children_1 + 5006.1883*data_ex1$   Children_2 + 6394.1939*data_ex1$   Children_3_or_more -120.1813*data_ex1$Elderly + 3296.5094*data_ex1$Worker - 5410.8987*data_ex1$TransSup)
-(Elasticity_HHIncome_av= mean(Elasticity_HHIncome)) 
-```
 First, we look at the linear model, and calculate the elasticity for **Household Income**:
 
 
@@ -236,9 +237,9 @@ head(select(data_ex1, c("VKMS", "prediction_c", "HHIncome", "elasticity_HHIncome
 ```{r}
 mean(data_ex1$elasticity_HHIncome_c)
 ```
-Result: 0.41
+Result: 0.54
 Interpretation: it represents the percentage change expected by a change in the income. 
-If the average elasticity is 0.41, then a change of 10% in HH_income leads to an expected change of $0.41*10\%=4.1\%$  in the number of kms 
+If the average elasticity is 0.54, then a change of 10% in HH_income leads to an expected change of $0.54*10\%=5.4\%$  in the number of kms 
 
 
 Then we look at the elasticity for **Transit supply**:
@@ -251,29 +252,20 @@ head(select(data_ex1, c("VKMS", "prediction_c", "TransSup", "elasticity_TransSup
 ```{r}
 mean(data_ex1$elasticity_TransSup_c)
 ```
-Result: -0.78
+Result: -1.19
 Interpretation: it represents the percentage change expected by a change in the income. 
-If the average elasticity is 0.78, then a change of 10% in Transit supply leads to an expected change of $-0.78*10\% = -7.8\% $  in the number of kms 
+If the average elasticity is 0.78, then a change of 10% in Transit supply leads to an expected change of $-1.19*10\% = -11.9\% $  in the number of kms 
 
 
 
-```{r}
-Elasticity_TransSup= - 5410.8987*data_ex1$TransSup/(-9562.1497 + 5406.8619*data_ex1$Car + 6.6552*data_ex1$HHIncome + 24083.2327*data_ex1$RoadDens + 1466.2595*data_ex1$   Children_1 + 5006.1883*data_ex1$   Children_2 + 6394.1939*data_ex1$   Children_3_or_more -120.1813*data_ex1$Elderly + 3296.5094*data_ex1$Worker - 5410.8987*data_ex1$TransSup)
-(Elasticity_TransSup_av= mean(Elasticity_TransSup))
-```
-As we have established earlier, the linear model does a better job of predicting the *annual vehicle kilometers per household*.
+As we have established earlier, the logarithmic model does a better job of predicting the *annual vehicle kilometers per household*. So we are also interested in the elasticities for this model
 
 ```{r}
 data_ex1$prediction_ln_c <- predict(model_ln_c, data_ex1)
-data_ex1$ln_elasticity_LN_INC_c = (model_ln_c$coefficients["LN_INC"]*1/data_ex1$prediction_ln_c)*(data_ex1$LN_INC/data_ex1$prediction_ln_c)
-data_ex1$ln_elasticity_HHIncome_c = model_ln_c$coefficients["HHIncome"]*(data_ex1$HHIncome/data_ex1$prediction_ln_c)
-head(select(data_ex1, c("LN_VKMS", "prediction_ln_c", "LN_INC", "ln_elasticity_LN_INC_c", "ln_elasticity_HHIncome_c")))
+data_ex1$ln_elasticity_LN_INC_c = model_ln_c$coefficients["LN_INC"]
+head(select(data_ex1, c("LN_VKMS", "prediction_ln_c", "LN_INC", "ln_elasticity_LN_INC_c")))
 ```
 
-```{r}
-mean(data_ex1$ln_elasticity_HHIncome_c)
-mean(data_ex1$ln_elasticity_LN_INC_c)
-```
 
 ```{r}
 data_ex1$ln_elasticity_TransSup_c = model_ln_c$coefficients["TransSup"]*(data_ex1$TransSup/data_ex1$prediction_ln_c)
@@ -284,33 +276,11 @@ mean(data_ex1$ln_elasticity_TransSup_c)
 ```
 
 
-
-```{r}
-# Average elasticity of mass transit supply
- # -0.54705
-# Result: -0.54705
-# Interpretation: it represents the percentage change expected by a change in the supply of mass transit 
-# If the average elasticity is -0.547, then a change of 10% in TransSup leads to an expected change of -0.547*10=5.47% in the number of kms 
-```
-
-
-
-```{r}
-# ---- WITH LN
-# Average elasticity of household income
-Elasticity_LN_INC= 0.44991*data_ex1$LN_INC/(5.38803 + 0.31517*data_ex1$Car + 0.44991*data_ex1$LN_INC + 1.56023*data_ex1$RoadDens + 0.08066*data_ex1$   Children_1 + 0.28958*data_ex1$   Children_2 + 0.38505*data_ex1$   Children_3_or_more -0.03120*data_ex1$Elderly + 0.03656*data_ex1$Worker - 0.37800*data_ex1$TransSup)
-(Elasticity_LN_INC_av= mean(Elasticity_LN_INC)) 
-# Result: 0.3373478
-# Interpretation: it represents the percentage change expected by a change in the income. 
-# If the average elasticity is 0.337, then a change of 10% in HH_income leads to an expected change of 0.337*10=3.37% in the number of kms 
-```
-
 # --------------------- Section F -----------------------------
-*Calculate the effect on the driving across the cities in a future scenario where all cities are expected to increase their mass transit supply with 50% while income is expected to
-increase by 10% (all remaining variables are assumed to be unchanged).*
+*Calculate the effect on the driving across the cities in a future scenario where all cities are expected to increase their mass transit supply with 50% while income is expected to increase by 10% (all remaining variables are assumed to be unchanged).*
 
 
-First we make predictions using our elasticities calculated for the linear model
+We make our predictions using our elasticities calculated. First, for the linear model:
 
 ```{r}
 data_ex1$prediction_new_elasticity = 
@@ -320,16 +290,15 @@ head(select(data_ex1,c("prediction_new_elasticity","prediction_c")))
 ```
 
 ```{r}
-mean(abs(data_ex1$prediction_new_elasticity - data_ex1$prediction_c))
+mean(data_ex1$prediction_new_elasticity - data_ex1$prediction_c)
 ```
-On average, the linear model predicts a 25 km increase in annual vehicle kilometers per household in this scenario.
+On average, the linear model predicts a 33 km increase in annual vehicle kilometers per household in this scenario.
 
 Let us look at what the logarithmic model predicts:
 
 ```{r}
 data_ex1$ln_prediction_new_elasticity = 
   data_ex1$prediction_ln_c + log(data_ex1$HHIncome*0.10)*mean(data_ex1$ln_elasticity_LN_INC_c) +
-  data_ex1$HHIncome*0.10*mean(data_ex1$ln_elasticity_HHIncome_c) +
   data_ex1$TransSup*0.50*mean(data_ex1$ln_elasticity_TransSup_c)
 head(select(data_ex1,c("ln_prediction_new_elasticity","prediction_ln_c")))
 ```
@@ -348,45 +317,19 @@ data_temp <- data_ex1 %>%
   filter(ln_prediction_new_elasticity > 0)
 mean(data_temp$ln_prediction_new_elasticity - data_temp$prediction_ln_c)
 ```
-So the average change in the log(annual vehicle kilometers) is predicted by the logarithmic model to be -0.22 in this scenario. The sign has actually changed.
-
-
-Finally, we want to see how the results look, if we change the underlying variables, instead of using our elasticity.
+The model predicts an average increase of $log(1.776081)$ in this scenario. If we take the exponential of this number:
 
 ```{r}
-# Old situation
-#Model_c_2_pred = predict(Model_c_2, newdata = data_ex1, interval="prediction")
-# Model_c_2_conf = predict(Model_c_2,data_ex1,interval="confidence")
-#(Model_c_2_pred_av= mean(Model_c_2_pred)) # Result: the average number in km would be 17701.43
+exp(1.776081)
 ```
 
-```{r}
-# New situation
-#data_ex1_2<-data_ex1
-#data_ex1_2$HHIncome=data_ex1_2$HHIncome*1.1
-#data_ex1_2$TransSup=data_ex1_2$TransSup*1.5
-#Model_f_pred = predict(Model_c_2,newdata = data_ex1_2, interval="prediction")
-# Model_f_conf = predict(Model_c_2,newdata = data_ex1_2,interval="confidence")
-#(Model_f_pred_av= mean(Model_f_pred)) # Result: the average number in km would be 17701.43
-# QUESTION Results are not correct. They lead to the same value, but it has to be different.
-```
 
- 
+So the average increase in this scenario is 5.9 annual vehicle kilometers.
 
+# --------------------- Section G -----------------------------
 
-# --------------------- Section F -----------------------------
+*Assuming your model to be correct, briefly discuss uncertainties in your forecast in f).*
 
-Model_f_conf = predict(Model_c_2,newdata = data_ex1_2,interval="confidence")
-
-# Discuss uncertainties in your forecast in f).-> output
-# Because they depend on different things: structure, input, parameters
-
-# Model structure (how the model represents the system object):
-
-# Model input (data collected): the model for prediction has been obtained from a specific
-# data, so there is uncertainity in the data collected. 
-#** They meet the hipothesis of normality, linearity, ... atipical points
-
-# Model parameters (parameters calibrated based on sample)
+# Irene
 
 
