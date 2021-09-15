@@ -1,0 +1,50 @@
+---
+title: "PF_1_2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE}
+library(tidyverse)
+library(mosaic)
+library(readxl)
+```
+
+```{r}
+data_ex2 <- read_excel("data/freqdata.xlsx")
+head(data_ex2)
+```
+
+```{r}
+fav_df <- rbind(
+  favstats(data_ex2$lnpop),
+  favstats(data_ex2$unempl),
+  favstats(data_ex2$sp65),
+  favstats(data_ex2$gdl),
+  favstats(data_ex2$bac08),
+  favstats(data_ex2$beltsc),
+  favstats(data_ex2$beltpr),
+  favstats(data_ex2$zerotol),
+  favstats(data_ex2$alr)
+)
+row.names(fav_df) <- c("ln(population)", "unemployment rate", "speed limit 65", "graduated driver license law", "Blood alcohol < 0.08 law", "Secondary seat belt law", "Primary seat belt law", "Zero tolerance alcohol law", "License revocation law")
+fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
+```
+
+ favstats(data_ex2$lnpop),
+  favstats(data_ex2$unempl),
+  favstats(data_ex2$sp65),
+  favstats(data_ex2$gdl),
+  favstats(data_ex2$bac08),
+  favstats(data_ex2$beltsc),
+  favstats(data_ex2$beltpr),
+  favstats(data_ex2$zerotol),
+  favstats(data_ex2$alr)
+
+```{r}
+data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr)) %>% cor()
+```
+
