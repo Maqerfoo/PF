@@ -11,12 +11,15 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(mosaic)
 library(readxl)
+library(lmtest)
 ```
 
 ```{r}
 data_ex2 <- read_excel("data/freqdata.xlsx")
 head(data_ex2)
 ```
+# --------------------- Section A -----------------------------
+*Make descriptive statistics, e.g. a table with summary statistics and a correlation matrix, and discuss the results, for the variables that you are going to use (read the whole exercise first to decide which variables are relevant in the descriptive statistics).*
 
 ```{r}
 fav_df <- rbind(
@@ -47,4 +50,60 @@ fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
 ```{r}
 data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr)) %>% cor()
 ```
+We notice a high positive correlation between the variables representing regulatory actions aimed towards limiting reckless driving behavior.
 
+# --------------------- Section B -----------------------------
+*Table 3 shows the estimation results from a Poisson regression with the number of accidents as dependent variable and using lnPop, unempl and sp65 as explanatory variables. Comment on the results.*
+
+![Model 1 estimation](./images/model_1.png)
+The first value that we look at, is the adjusted $\rho^2$. The formula for $\rho^2$ is:
+
+```{r}
+1- (-3124.2/-5026.9)
+```
+And, similarly to adjusted $R^2$, it represents the amount of variation that is explained by the model (Final LL), compared to a model with no parameters (Null LL). So the explanatory variables included in the model *log(Population), Unemployment rate, Speed limit of 65 mph law* are explaining some of the variation present in our measurements of the response-variable, the number of casualties in traffic among 16 year olds. We also see the p-values reflecting the t-test for the null-hypothesis of the variables having no influence on the mean being very low, meaning there is a high degree of statistical evidence that can let us reject the null-hypothesis of the variables being insignificant.
+
+We see that population is positively correlated with the response variable. Which makes sense, as the presence of people is an essential requirement for people to get into traffic accidents. The unemployment rate has a negative correlation with the number of accidents. Perhaps because unemployed people are driving less, or have less access to vehicles. And finally we see that a speed limit of 65 mph has a reducing effect on the number of casualties.
+
+
+# --------------------- Section C -----------------------------
+*Table 4 shows the estimation results from two other Poisson regressions with the number of accidents as dependent variable and additional explanatory variables. Comment on the differences among the models in Tables 3 and 4 and argue which model you prefer, e.g. by the use of LR tests as well as by looking at the signs of parameters.*
+
+![Model 2 and 3 estimations](./images/model_2_and_3.png)
+Here we see two models. One model is including all the variables listed in the table, and the other model has excluded variables *gdl, Zerotol and Alr*. First thing we notice is that the adjusted $\rho^2$ is very close for the two models.
+
+We can evaluate the two models against eachother by the log-likelihood ratio test
+
+$LLR = -2 * (LL(\hat{\beta}_k) - LL(\hat{\beta}_p))\sim \chi^2_{f=k-p}$
+So the $LLR$ test statistic is $\chi^2$ distributed over degrees of freedom equal to the difference in number of parameters between the two models
+
+```{r}
+teststat <- -2 * (-3030.1 - (-3068.5))
+teststat
+```
+We use the pchisq function to evaluate this statistic over a $\chi^2$ distribution with degrees of freedom = $9-6$
+
+```{r}
+pchisq(teststat, df = 9-6)
+```
+This p-value represents the amount of evidence supporting the null-hypothesis that the simpler model is equally as good at explaining the variance in the dataset, as the model with more parameters. With a p-value of ~0, we can reject the null-hypothesis. 
+
+So it seems that some of the additional variables *gdl, Zerotol and Alr* are significant at explaining the amount of variance. The variable that jumps out as most interesting to explore is alr, as it has the highest estimated effect. If we look at the correlation matrix we also see that it is positively correlated with the other two variables *zerotol* and *gdl*. So we try to reconstruct the extended model:
+
+```{r}
+poisson_extended <- glm(fatal ~ lnpop + unempl + sp65 + gdl + bac08 + beltsc + beltpr + zerotol + alr, data=data_ex2, family=poisson(link="log"))
+summary(poisson_extended)
+```
+And we create the simple model, but this time with *alr* included:
+
+```{r}
+poisson_simple_alr <- glm(fatal ~ lnpop + unempl + sp65 + bac08 + beltsc + beltpr + alr, data=data_ex2, family=poisson(link="log"))
+summary(poisson_simple_alr)
+```
+And we run the $LLR$ test for these two models:
+
+```{r}
+lrtest(poisson_extended, poisson_simple_alr)
+```
+
+Now we have some evidence supporting the null-hypothesis at a significance-level of 0.10. We cannot reject the null-hypothesis that these two models are similar.
