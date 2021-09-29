@@ -1,0 +1,100 @@
+---
+title: "PF_2_answers"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(mosaic)
+library(readxl)
+```
+
+```{r}
+data_ex1 <- read_excel("data/Trips2020.xlsx")
+head(data_ex1)
+```
+## Descriptive statistics
+
+Analyse the data using descriptive statistics, e.g. summary statistics and a correlation matrix. What is the average number of trips using Trips and Trips1? Also plot the distribution of trips using the Trips1 variable. Comment your results.
+
+```{r}
+fav_df <- rbind(
+  favstats(data_ex1$Income),
+  favstats(data_ex1$Cars),
+  favstats(data_ex1$Age),
+  favstats(data_ex1$Male),
+  favstats(data_ex1$Trips),
+  favstats(data_ex1$Trips1)
+)
+row.names(fav_df) <- c("Income", "Cars", "Age", "Male", "Trips", "Trips1")
+fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
+```
+
+```{r}
+cor(data_ex1)
+```
+
+```{r}
+hist(data_ex1$Trips1)
+```
+Assume you have estimated a Poisson model with the number of trips as dependent variable based on Trips1 with the following specification for the expected number of tours:
+
+#add table
+
+What can you say about the results and what is the expected number of trips for your sample according to the model? In addition, try to analyse the expected number of individuals with 0,1,2,3,4,5+ trips based on your model. Finally, use your estimated model to simulate the effect from a 20% increase in income on the number of trips. You can use either the income elasticity or simulation (the latter is similar to what you have to do for the logit model in step 5).
+
+```{r}
+data_ex1$poisson_results <- exp((1.001 + 0.058*log(data_ex1$Income + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
+hist(data_ex1$poisson_results)#,ylim = c(1,100),xlim = c(0,5))
+```
+
+
+```{r}
+data_ex1$poisson_results <- exp((1.001 + 0.058*log(data_ex1$Income + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
+mean(data_ex1$poisson_results)
+```
+
+
+```{r}
+number_of_people <- c(
+  dpois(0, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(1, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(2, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(3, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(4, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  ppois(4, mean(data_ex1$poisson_results), log = FALSE, lower.tail=FALSE) * 1000)
+number_of_people
+```
+```{r}
+sum(number_of_people)
+```
+Elasticity of income with regards to trips is the beta-coefficient, because it is a log-log model
+
+```{r}
+20*0.058
+```
+```{r}
+data_ex1$poisson_results_increased_income <- exp((1.001 + 0.058*log(data_ex1$Income*1.20 + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
+mean(data_ex1$poisson_results_increased_income)/mean(data_ex1$poisson_results)
+```
+Specify a trip generation model based on cross-classification where you use at least two of the four variables in the Trips2020 data. You can use the quartiles of income to divide income in four intervals. Use the data to determine rates for different groups of individuals and use these rates when income is increased by 20% in a scenario. Discuss the difference between the cross-classification results and the results of the Poisson model.
+
+```{r}
+data_ex1$Income_1 <- ifelse(data_ex1$Income <= 100, 1,0)
+data_ex1$Income_2 <- ifelse(data_ex1$Income > 100 & data_ex1$Income <= 220, 1,0)
+data_ex1$Income_3 <- ifelse(data_ex1$Income > 220 & data_ex1$Income <= 350 , 1,0)
+data_ex1$Income_4 <- ifelse(data_ex1$Income > 350, 1,0)
+```
+
+```{r}
+head(data_ex1)
+```
+
+```{r}
+
+```
+

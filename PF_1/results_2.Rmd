@@ -1,6 +1,8 @@
 ---
 title: "PF_1_2"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -61,6 +63,9 @@ The first value that we look at, is the adjusted $\rho^2$. The formula for $\rho
 ```{r}
 1- (-3124.2/-5026.9)
 ```
+
+# Comment on interpretation of values.
+
 And, similarly to adjusted $R^2$, it represents the amount of variation that is explained by the model (Final LL), compared to a model with no parameters (Null LL). So the explanatory variables included in the model *log(Population), Unemployment rate, Speed limit of 65 mph law* are explaining some of the variation present in our measurements of the response-variable, the number of casualties in traffic among 16 year olds. We also see the p-values reflecting the t-test for the null-hypothesis of the variables having no influence on the mean being very low, meaning there is a high degree of statistical evidence that can let us reject the null-hypothesis of the variables being insignificant.
 
 We see that population is positively correlated with the response variable. Which makes sense, as the presence of people is an essential requirement for people to get into traffic accidents. The unemployment rate has a negative correlation with the number of accidents. Perhaps because unemployed people are driving less, or have less access to vehicles. And finally we see that a speed limit of 65 mph has a reducing effect on the number of casualties.
@@ -102,7 +107,8 @@ summary(poisson_simple_alr)
 ```
 And we run the $LLR$ test for these two models:
 
-```{r}
+
+```{r, message = FALSE}
 lrtest(poisson_extended, poisson_simple_alr)
 ```
 
