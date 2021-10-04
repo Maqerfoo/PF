@@ -11,7 +11,28 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(mosaic)
 library(readxl)
+library(gmodels)
 ```
+
+```{r, include=FALSE}
+plot_histogram <- function(df, feature) {
+    plt <- ggplot(df, aes(x=eval(parse(text=feature)))) +
+    geom_histogram(aes(y = ..density..), alpha=0.7,binwidth=1, fill="#33AADE", color="black") +
+    geom_density(alpha=0.3, fill="red") +
+    geom_vline(aes(xintercept=mean(eval(parse(text=feature)))), color="black", linetype="dashed", size=1) +
+    labs(x=feature, y = "Density")
+    print(plt)
+}
+plot_multi_histogram <- function(df, feature, label_column) {
+    plt <- ggplot(df, aes(x=eval(parse(text=feature)), fill=eval(parse(text=label_column)))) +
+    geom_histogram(alpha=0.7, position="identity", binwidth=1,aes(y = ..density..), color="black") +
+    geom_density(alpha=0.7) +
+    geom_vline(aes(xintercept=mean(eval(parse(text=feature)))), color="black", linetype="dashed", size=1) +
+    labs(x=feature, y = "Density")
+    plt + guides(fill=guide_legend(title=label_column))
+}
+```
+
 
 ```{r}
 data_ex1 <- read_excel("data/Trips2020.xlsx")
@@ -39,7 +60,7 @@ cor(data_ex1)
 ```
 
 ```{r}
-hist(data_ex1$Trips1)
+plot_histogram(data_ex1, "Trips")
 ```
 Assume you have estimated a Poisson model with the number of trips as dependent variable based on Trips1 with the following specification for the expected number of tours:
 
@@ -49,8 +70,17 @@ What can you say about the results and what is the expected number of trips for 
 
 ```{r}
 data_ex1$poisson_results <- exp((1.001 + 0.058*log(data_ex1$Income + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
-hist(data_ex1$poisson_results)#,ylim = c(1,100),xlim = c(0,5))
+plot_histogram(data_ex1, "poisson_results")
 ```
+
+```{r}
+df <- data.frame("Trips"=c(data_ex1$poisson_results, data_ex1$Trips), "method"=rep(c("poisson model","empirical"), times=c(1000,1000)))
+plot_multi_histogram(df, "Trips", "method")
+```
+
+
+
+
 
 
 ```{r}
@@ -77,24 +107,86 @@ Elasticity of income with regards to trips is the beta-coefficient, because it i
 ```{r}
 20*0.058
 ```
+
 ```{r}
-data_ex1$poisson_results_increased_income <- exp((1.001 + 0.058*log(data_ex1$Income*1.20 + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
+data_ex1$poisson_results_increased_income <- exp((1.001 + 0.058*log(data_ex1$Income *1.20 + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
 mean(data_ex1$poisson_results_increased_income)/mean(data_ex1$poisson_results)
 ```
 Specify a trip generation model based on cross-classification where you use at least two of the four variables in the Trips2020 data. You can use the quartiles of income to divide income in four intervals. Use the data to determine rates for different groups of individuals and use these rates when income is increased by 20% in a scenario. Discuss the difference between the cross-classification results and the results of the Poisson model.
 
+
 ```{r}
-data_ex1$Income_1 <- ifelse(data_ex1$Income <= 100, 1,0)
-data_ex1$Income_2 <- ifelse(data_ex1$Income > 100 & data_ex1$Income <= 220, 1,0)
-data_ex1$Income_3 <- ifelse(data_ex1$Income > 220 & data_ex1$Income <= 350 , 1,0)
-data_ex1$Income_4 <- ifelse(data_ex1$Income > 350, 1,0)
+data_ex1$Income_group = 0
+data_ex1$Age_group = 0
+data_ex1$Cars_truncated <- data_ex1$Cars
+data_ex1$Income_group[data_ex1$Income <= 100] <-  1
+data_ex1$Income_group[data_ex1$Income > 100 & data_ex1$Income <= 220] <-  2
+data_ex1$Income_group[data_ex1$Income > 220 & data_ex1$Income <= 350] <- 3
+data_ex1$Income_group[data_ex1$Income > 350] <- 4
+data_ex1$Age_group[data_ex1$Age <= 27.75] <- 1
+data_ex1$Age_group[data_ex1$Age > 27.75 & data_ex1$Age <= 44] <- 2
+data_ex1$Age_group[data_ex1$Age > 44 & data_ex1$Age <= 61] <- 3
+data_ex1$Age_group[data_ex1$Age > 61] <- 4
+data_ex1$Cars_truncated[data_ex1$Cars > 2] <- 2
 ```
 
 ```{r}
 head(data_ex1)
 ```
 
-```{r}
 
+```{r}
+cross_classification <- data_ex1%>%
+  group_by(Income_group, Age_group, Cars_truncated) %>%
+  summarise(Trips = sum(Trips1), n=n(), avg_trips=Trips/n)
+cross_classification
+```
+n is too small for some groups. So we try to remove the age group variable.
+
+```{r}
+cross_classification <- data_ex1%>%
+  group_by(Income_group, Cars_truncated) %>%
+  summarise(Trips = sum(Trips1), n=n(), avg_trips=Trips/n)
+cross_classification
+```
+
+
+```{r}
+data_ex1_sc <- data_ex1
+data_ex1_sc$Income <- data_ex1_sc$Income*1.20
+
+data_ex1_sc$Income_group[data_ex1_sc$Income <= 100] <-  1
+data_ex1_sc$Income_group[data_ex1_sc$Income > 100 & data_ex1_sc$Income <= 220] <-  2
+data_ex1_sc$Income_group[data_ex1_sc$Income > 220 & data_ex1_sc$Income <= 350] <- 3
+data_ex1_sc$Income_group[data_ex1_sc$Income > 350] <- 4
+```
+
+
+
+```{r}
+summary_sc <- data_ex1_sc %>%
+  group_by(Income_group, Cars_truncated) %>%
+  summarise(Trips = sum(Trips1), n=n(), avg_trips=Trips/n)
+summary_sc
+```
+
+```{r}
+cross_classification_2 <- subset(summary_sc, select=-avg_trips)
+cross_classification_2$Cross_classification_trips <- summary_sc$n * cross_classification$avg_trips
+cross_classification_2$Cross_classification <- cross_classification$avg_trips
+cross_classification_2$n <- summary_sc$n
+cross_classification_2$Income_group <- summary_sc$Income_group
+cross_classification_2$Cars_truncated <- summary_sc$Cars_truncated
+cross_classification_2$error <- cross_classification_2$Trips-cross_classification_2$Cross_classification_trips
+cross_classification_2
+```
+We can calculate the error-terms MSE, MAD and MAPE.
+
+```{r}
+MSE = mean(cross_classification_2$error^2)
+MAD = mean(abs(cross_classification_2$error))
+MAPE = mean(abs(cross_classification_2$error/cross_classification_2$Trips) * 100)
+evaluation <- data.frame(MSE,MAD,MAPE)
+evaluation
 ```
 
