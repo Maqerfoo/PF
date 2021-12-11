@@ -36,21 +36,18 @@ fav_df <- rbind(
   favstats(data_ex2$alr)
 )
 row.names(fav_df) <- c("ln(population)", "unemployment rate", "speed limit 65", "graduated driver license law", "Blood alcohol < 0.08 law", "Secondary seat belt law", "Primary seat belt law", "Zero tolerance alcohol law", "License revocation law")
-fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
+fav_df <- fav_df  %>% round(digits=2)
+fav_df
 ```
 
- favstats(data_ex2$lnpop),
-  favstats(data_ex2$unempl),
-  favstats(data_ex2$sp65),
-  favstats(data_ex2$gdl),
-  favstats(data_ex2$bac08),
-  favstats(data_ex2$beltsc),
-  favstats(data_ex2$beltpr),
-  favstats(data_ex2$zerotol),
-  favstats(data_ex2$alr)
+corr_matrix <- cor(round(select(data_ex1,-c("ID")), digits=2))
+corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 
 ```{r}
-data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr)) %>% cor()
+library(corrplot)
+corr_matrix <- data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr)) %>% cor()
+round(corr_matrix, digits=3)
+corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 ```
 We notice a high positive correlation between the variables representing regulatory actions aimed towards limiting reckless driving behavior.
 
@@ -113,3 +110,114 @@ lrtest(poisson_extended, poisson_simple_alr)
 ```
 
 Now we have some evidence supporting the null-hypothesis at a significance-level of 0.10. We cannot reject the null-hypothesis that these two models are similar.
+
+```{r}
+data_ex2$elasticity_lnpop=poisson_extended$coefficients['lnpop']
+data_ex2$elasticity_unempl=data_ex2$unempl*poisson_extended$coefficients['unempl']
+
+fav_df <- rbind(
+  favstats(data_ex2$elasticity_lnpop),
+  favstats(data_ex2$elasticity_unempl)
+)
+row.names(fav_df) <- c("ln(population)", "unemployment rate")
+fav_df <- fav_df  %>% round(digits=3)
+fav_df
+```
+
+```{r}
+res <- resid(poisson_extended)
+plot(fitted(poisson_extended), res)
+abline(0,0)
+qqnorm(res)
+qqline(res)
+plot(density(res))
+```
+```{r}
+ols_plot_cooksd_chart(poisson_extended)
+```
+```{r}
+plot(poisson_extended)
+```
+```{r}
+plot(cooks.distance(poisson_extended), type="h")
+```
+```{r}
+plot(poisson_extended, which = 4)
+```
+```{r}
+plot(poisson_extended, which = 5)
+abline(h=3)
+abline(h=-3)
+abline(v=0.05)
+```
+
+```{r}
+df <- dffits(poisson_extended)
+plot(dffits(poisson_extended), pch="*", cex=2, main="Influential Obs by DFFIT")  
+abline(h = 0.4, col="red")   
+abline(h = -0.4, col="red")  
+text(x=1:length(df), y=df, labels=ifelse(df>0.4, names(df),""), col="red", pos = 4)
+text(x=1:length(df), y=df, labels=ifelse(df<(-0.4), names(df),""), col="red", pos = 4) 
+
+```
+
+
+```{r}
+plot_dfbetas <- function(model){
+  dfbts <- dfbetas(model)
+  #par(mfrow=c(ncol(dfbetas)%/%2 + ncol(dfbetas)%%2,2))
+  for (x in colnames(dfbetas)){
+    plot(dfbetas[,x], ylab=x)
+    abline(h = 4/sqrt(nrow(dfbetas)), col = "red")
+    abline(h = -4/sqrt(nrow(dfbetas)), col="red")
+    text(names(dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))]), dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))], labels=names(dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))]),  cex=0.9, font=2)
+  }
+}
+  
+```
+
+
+```{r}
+plot_dfbetas(poisson_extended)
+```
+```{r}
+dfbetas <- as_tibble(dfbetas)
+medians <- cbind(
+  median(dfbetas$`(Intercept)`),
+  median(dfbetas$lnpop),
+  median(dfbetas$unempl),
+  median(dfbetas$sp65),
+  median(dfbetas$gdl),
+  median(dfbetas$bac08),
+  median(dfbetas$beltsc),
+  median(dfbetas$beltpr),
+  median(dfbetas$zerotol),
+  median(dfbetas$alr)
+)
+colnames(medians) <- colnames(dfbetas)
+
+dfbetas_infl <- rbind(
+  medians,
+  dfbetas %>% slice(812,811,807,80)
+)
+rownames(dfbetas_infl) <- c("median",812,811,807,80)
+dfbetas_infl
+  
+```
+
+
+```{r}
+plot(dfbetas[,"lnpop"])
+```
+
+
+```{r}
+ols_plot_dfbetas(poisson_extended)
+```
+
+
+
+```{r}
+g <- ols_plot_resid_lev(poisson_extended)
+```
+
