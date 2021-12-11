@@ -83,13 +83,13 @@ $LLR = -2 * (LL(\hat{\beta}_k) - LL(\hat{\beta}_p))\sim \chi^2_{f=k-p}$
 So the $LLR$ test statistic is $\chi^2$ distributed over degrees of freedom equal to the difference in number of parameters between the two models
 
 ```{r}
-teststat <- -2 * (-3030.1 - (-3068.5))
+teststat <- -(2) * (-3068.5 - (-3030.1))
 teststat
 ```
 We use the pchisq function to evaluate this statistic over a $\chi^2$ distribution with degrees of freedom = $9-6$
 
 ```{r}
-pchisq(teststat, df = 9-6)
+pchisq(teststat, df = 9-6, lower.tail=FALSE)
 ```
 This p-value represents the amount of evidence supporting the null-hypothesis that the simpler model is equally as good at explaining the variance in the dataset, as the model with more parameters. With a p-value of ~0, we can reject the null-hypothesis. 
 

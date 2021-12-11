@@ -1,6 +1,7 @@
 ---
 title: "PORTFOLIO 1 - EXERCISE 1"
 output:
+  word_document: default
   html_document:
     df_print: paged
 ---
@@ -31,15 +32,24 @@ fav_df <- rbind(
   favstats(data_ex1$Elderly),
   favstats(data_ex1$RoadDens),
   favstats(data_ex1$TransSup),
-  favstats(data_ex1$Worker)
+  favstats(data_ex1$Worker),
+  favstats(data_ex1$VKMS)
 )
-row.names(fav_df) <- c("Children", "Car", "HHIncome", "Elderly", "RoadDens", "TransSup", "Worker")
-fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
+row.names(fav_df) <- c("Children", "Car", "HHIncome", "Elderly", "RoadDens", "TransSup", "Worker", "VKMS")
+fav_df <- round(fav_df,digits=2)
+fav_df
 ```
 
 ```{r}
-cor(data_ex1)
+library(corrplot)
+corr_matrix <- cor(round(select(data_ex1,-c("ID")), digits=2))
+corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 ```
+```{r}
+round(corr_matrix, digits=3)
+```
+
+
 We note variables that are highly correlated with VKMS:
 
 **Children, Car, HHIncome, Elderly, RoadDens, TransSup** and **Worker**
@@ -129,7 +139,7 @@ The model has lost a negligible amount of $R^2$, but the F-score has improved. I
 We see also that two variables are not statistically significant even below the 0.1 level. If we look at the correlation-matrix, we see that *Elderly* are highly negatively correlated with *Worker*. Which makes sense, logically speaking, as some degree of elders may be retired. We choose to keep the *Worker* variable, as it covers a wider range of people.
 
 ```{r}
-model_ln_b <- lm(LN_VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + HHIncome + LN_INC + RoadDens + Worker, data = data_ex1)
+model_ln_b <- lm(LN_VKMS ~ Children_1 + Children_2 + Children_3_or_more + Car + LN_INC + RoadDens + Worker, data = data_ex1)
 summary(model_ln_b)
 ```
  $R^2 = 0.6008$ and $F = 859.2$
@@ -226,51 +236,17 @@ OUR BEST MODEL IS model_ln_c
 # --------------------- Section E -----------------------------
 *Calculate the average elasticity of VKMS with respect to household income and mass transit supply. Interpret the elasticity that you find.*
 
-First, we look at the linear model, and calculate the elasticity for **Household Income**:
-
-
-```{r}
-data_ex1$prediction_c <- predict(model_c, data_ex1)
-data_ex1$elasticity_HHIncome_c = model_c$coefficients["HHIncome"]*(data_ex1$HHIncome/data_ex1$prediction_c)
-head(select(data_ex1, c("VKMS", "prediction_c", "HHIncome", "elasticity_HHIncome_c")))
-```
-```{r}
-mean(data_ex1$elasticity_HHIncome_c)
-```
-Result: 0.54
-Interpretation: it represents the percentage change expected by a change in the income. 
-If the average elasticity is 0.54, then a change of 10% in HH_income leads to an expected change of $0.54*10\%=5.4\%$  in the number of kms 
-
-
-Then we look at the elasticity for **Transit supply**:
-
-```{r}
-data_ex1$elasticity_TransSup_c = model_c$coefficients["TransSup"]*(data_ex1$TransSup/data_ex1$prediction_c)
-head(select(data_ex1, c("VKMS", "prediction_c", "TransSup", "elasticity_TransSup_c")))
-```
-
-```{r}
-mean(data_ex1$elasticity_TransSup_c)
-```
-Result: -1.19
-Interpretation: it represents the percentage change expected by a change in the income. 
-If the average elasticity is 0.78, then a change of 10% in Transit supply leads to an expected change of $-1.19*10\% = -11.9\% $  in the number of kms 
-
 
 
 As we have established earlier, the logarithmic model does a better job of predicting the *annual vehicle kilometers per household*. So we are also interested in the elasticities for this model
 
 ```{r}
-data_ex1$prediction_ln_c <- predict(model_ln_c, data_ex1)
 data_ex1$ln_elasticity_LN_INC_c = model_ln_c$coefficients["LN_INC"]
-head(select(data_ex1, c("LN_VKMS", "prediction_ln_c", "LN_INC", "ln_elasticity_LN_INC_c")))
+data_ex1$ln_elasticity_TransSup_c <- model_ln_c$coefficients["TransSup"]*data_ex1$TransSup
+head(select(data_ex1,c("VKMS","HHIncome","TransSup","ln_elasticity_LN_INC_c","ln_elasticity_TransSup_c")))
 ```
 
 
-```{r}
-data_ex1$ln_elasticity_TransSup_c = model_ln_c$coefficients["TransSup"]*(data_ex1$TransSup/data_ex1$prediction_ln_c)
-head(select(data_ex1, c("LN_VKMS", "prediction_ln_c", "TransSup", "ln_elasticity_TransSup_c")))
-```
 ```{r}
 mean(data_ex1$ln_elasticity_TransSup_c)
 ```
@@ -280,48 +256,23 @@ mean(data_ex1$ln_elasticity_TransSup_c)
 *Calculate the effect on the driving across the cities in a future scenario where all cities are expected to increase their mass transit supply with 50% while income is expected to increase by 10% (all remaining variables are assumed to be unchanged).*
 
 
-We make our predictions using our elasticities calculated. First, for the linear model:
-
-```{r}
-data_ex1$prediction_new_elasticity = 
-    data_ex1$prediction_c + data_ex1$HHIncome*0.10*mean(data_ex1$elasticity_HHIncome_c) +
-    data_ex1$TransSup*0.50*mean(data_ex1$elasticity_TransSup_c)
-head(select(data_ex1,c("prediction_new_elasticity","prediction_c")))
-```
-
-```{r}
-mean(data_ex1$prediction_new_elasticity - data_ex1$prediction_c)
-```
-On average, the linear model predicts a 33 km increase in annual vehicle kilometers per household in this scenario.
 
 Let us look at what the logarithmic model predicts:
 
 ```{r}
-data_ex1$ln_prediction_new_elasticity = 
-  data_ex1$prediction_ln_c + log(data_ex1$HHIncome*0.10)*mean(data_ex1$ln_elasticity_LN_INC_c) +
-  data_ex1$TransSup*0.50*mean(data_ex1$ln_elasticity_TransSup_c)
-head(select(data_ex1,c("ln_prediction_new_elasticity","prediction_ln_c")))
+data_ex1$ln_prediction_new_elasticity <- data_ex1$VKMS + 0.10*data_ex1$ln_elasticity_LN_INC_c*data_ex1$VKMS + 0.50*data_ex1$ln_elasticity_TransSup_c*data_ex1$VKMS
+data_ex1$change = data_ex1$ln_prediction_new_elasticity - data_ex1$VKMS
+head(select(data_ex1,c("ln_prediction_new_elasticity","VKMS","change")))
 ```
-We have to remove some observations where the household income was reported as 0, since $log(0) = -\infty$
 
 ```{r}
-data_ex1 %>% 
-  arrange(ln_prediction_new_elasticity) %>%
-  select(ln_prediction_new_elasticity) %>%
-  head()
+mean(data_ex1$change)
 ```
 
 
-```{r}
-data_temp <- data_ex1 %>% 
-  filter(ln_prediction_new_elasticity > 0)
-mean(data_temp$ln_prediction_new_elasticity - data_temp$prediction_ln_c)
-```
-The model predicts an average increase of $log(1.776081)$ in this scenario. If we take the exponential of this number:
 
-```{r}
-exp(1.776081)
-```
+
+
 
 
 So the average increase in this scenario is 5.9 annual vehicle kilometers.
@@ -332,4 +283,15 @@ So the average increase in this scenario is 5.9 annual vehicle kilometers.
 
 # Irene
 
+```{r}
+res <- resid(model_ln_c)
+plot(fitted(model_ln_c), res)
+abline(0,0)
+qqnorm(res)
+qqline(res)
+plot(density(res))
+```
+```{r}
+ols_plot_cooksd_bar(model_ln_c)
+```
 
