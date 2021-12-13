@@ -1,7 +1,10 @@
 ---
 title: "PF_2_answers"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -12,6 +15,7 @@ library(tidyverse)
 library(mosaic)
 library(readxl)
 library(gmodels)
+library(corrplot)
 ```
 
 ```{r, include=FALSE}
@@ -38,9 +42,11 @@ plot_multi_histogram <- function(df, feature, label_column) {
 data_ex1 <- read_excel("data/Trips2020.xlsx")
 head(data_ex1)
 ```
-## Descriptive statistics
 
-Analyse the data using descriptive statistics, e.g. summary statistics and a correlation matrix. What is the average number of trips using Trips and Trips1? Also plot the distribution of trips using the Trips1 variable. Comment your results.
+
+# Section 1: Descriptive statistics
+
+*Analyse the data using descriptive statistics, e.g. summary statistics and a correlation matrix. What is the average number of trips using Trips and Trips1? Also plot the distribution of trips using the Trips1 variable. Comment your results*.
 
 ```{r}
 fav_df <- rbind(
@@ -52,26 +58,57 @@ fav_df <- rbind(
   favstats(data_ex1$Trips1)
 )
 row.names(fav_df) <- c("Income", "Cars", "Age", "Male", "Trips", "Trips1")
-fav_df  %>% mutate(across(where(is.numeric), ~ round(., 4)))
+fav_df  %>% round(digits=2)
+```
+The average number of trips using Trips is 3.12 and using Trips1 is 2.84. The fact that both values are similar may be explained by low number of observations with Trip's values over 5.
+
+
+And the correlation matrix would be:
+```{r}
+corr_matrix <- cor(data_ex1)
+
+corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 ```
 
 ```{r}
-cor(data_ex1)
+round(corr_matrix, digits=3)
 ```
+
+
+We note that explanatory variables are not highly correlated with each other. Trips and Trips1 are highly correlated since they are quite similar by definition. 
 
 ```{r}
 plot_histogram(data_ex1, "Trips")
 ```
-Assume you have estimated a Poisson model with the number of trips as dependent variable based on Trips1 with the following specification for the expected number of tours:
+```{r}
+counts <- data_ex1 %>% group_by(Trips1) %>% count()
+number_of_trips <- c("0","1","2","3","4","5+")
+estimations <- as_tibble(rbind(counts$n))
+colnames(estimations) <- number_of_trips
+estimations
+```
+
+
+Now it is confirmed what it was supposed above: there are not many observations which take more than 5 trips per day.  
+
+
+# Section 2: Poisson model
+
+*Assume you have estimated a Poisson model with the number of trips as dependent variable based on Trips1 with the following specification for the expected number of tours:*
+
+#add model expression
+
+*where 1 is added to income to allow for ln(). We get the following results*
 
 #add table
 
-What can you say about the results and what is the expected number of trips for your sample according to the model? In addition, try to analyse the expected number of individuals with 0,1,2,3,4,5+ trips based on your model. Finally, use your estimated model to simulate the effect from a 20% increase in income on the number of trips. You can use either the income elasticity or simulation (the latter is similar to what you have to do for the logit model in step 5).
+*What can you say about the results and what is the expected number of trips for your sample according to the model? In addition, try to analyse the expected number of individuals with 0,1,2,3,4,5+ trips based on your model. Finally, use your estimated model to simulate the effect from a 20% increase in income on the number of trips. You can use either the income elasticity or simulation (the latter is similar to what you have to do for the logit model in step 5)*
 
 ```{r}
 data_ex1$poisson_results <- exp((1.001 + 0.058*log(data_ex1$Income + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
 plot_histogram(data_ex1, "poisson_results")
 ```
+
 
 ```{r}
 df <- data.frame("Trips"=c(data_ex1$poisson_results, data_ex1$Trips), "method"=rep(c("poisson model","empirical"), times=c(1000,1000)))
@@ -97,11 +134,36 @@ number_of_people <- c(
   dpois(3, mean(data_ex1$poisson_results), log = FALSE) * 1000,
   dpois(4, mean(data_ex1$poisson_results), log = FALSE) * 1000,
   ppois(4, mean(data_ex1$poisson_results), log = FALSE, lower.tail=FALSE) * 1000)
-number_of_people
+number_of_trips <- c("0","1","2","3","4","5+")
+estimations <- as_tibble(rbind(number_of_people))
+colnames(estimations) <- number_of_trips
+estimations
+num_trips1 <- sum(estimations)
+```
+
+
+```{r}
+barplot(height=number_of_people, names=number_of_trips, col="red")
 ```
 ```{r}
-sum(number_of_people)
+number_of_people <- c(
+  dpois(0, mean(data_ex1$poisson_results)*1.016, log = FALSE) * 1000,
+  dpois(1, mean(data_ex1$poisson_results)*1.016, log = FALSE) * 1000,
+  dpois(2, mean(data_ex1$poisson_results)*1.016, log = FALSE) * 1000,
+  dpois(3, mean(data_ex1$poisson_results)*1.016, log = FALSE) * 1000,
+  dpois(4, mean(data_ex1$poisson_results)*1.016, log = FALSE) * 1000,
+  ppois(4, mean(data_ex1$poisson_results)*1.016, log = FALSE, lower.tail=FALSE) * 1000)
+number_of_trips <- c("0","1","2","3","4","5+")
+estimations <- as_tibble(rbind(number_of_people))
+colnames(estimations) <- number_of_trips
+estimations
 ```
+
+```{r}
+barplot(height=number_of_people, names=colnames(estimations), col="cyan")
+```
+
+
 Elasticity of income with regards to trips is the beta-coefficient, because it is a log-log model
 
 ```{r}
@@ -112,7 +174,10 @@ Elasticity of income with regards to trips is the beta-coefficient, because it i
 data_ex1$poisson_results_increased_income <- exp((1.001 + 0.058*log(data_ex1$Income *1.20 + 1) + 0.043*data_ex1$Cars + -0.005*data_ex1$Age + -0.099*data_ex1$Male))
 mean(data_ex1$poisson_results_increased_income)/mean(data_ex1$poisson_results)
 ```
-Specify a trip generation model based on cross-classification where you use at least two of the four variables in the Trips2020 data. You can use the quartiles of income to divide income in four intervals. Use the data to determine rates for different groups of individuals and use these rates when income is increased by 20% in a scenario. Discuss the difference between the cross-classification results and the results of the Poisson model.
+
+# Section 3: trip generation model based
+
+*Specify a trip generation model based on cross-classification where you use at least two of the four variables in the Trips2020 data. You can use the quartiles of income to divide income in four intervals. Use the data to determine rates for different groups of individuals and use these rates when income is increased by 20% in a scenario. Discuss the difference between the cross-classification results and the results of the Poisson model.*
 
 
 ```{r}
@@ -134,14 +199,6 @@ data_ex1$Cars_truncated[data_ex1$Cars > 2] <- 2
 head(data_ex1)
 ```
 
-
-```{r}
-cross_classification <- data_ex1%>%
-  group_by(Income_group, Age_group, Cars_truncated) %>%
-  summarise(Trips = sum(Trips1), n=n(), avg_trips=Trips/n)
-cross_classification
-```
-n is too small for some groups. So we try to remove the age group variable.
 
 ```{r}
 cross_classification <- data_ex1%>%
@@ -183,10 +240,248 @@ cross_classification_2
 We can calculate the error-terms MSE, MAD and MAPE.
 
 ```{r}
+index <- c("Income_group","Cars_truncated","0","1","2","3","4","5+")
+estimations = data.frame(matrix(vector(), 0, length(index),
+                dimnames=list(c(), index)))
+
+for (i in 1:nrow(cross_classification_2)){
+  number_of_people <- c(
+  cross_classification_2[[i,"Income_group"]],
+  cross_classification_2[[i,"Cars_truncated"]],
+  dpois(0, cross_classification_2[[i,"Cross_classification"]], log = FALSE) * cross_classification_2[[i,"n"]],
+  dpois(1, cross_classification_2[[i,"Cross_classification"]], log = FALSE) * cross_classification_2[[i,"n"]],
+  dpois(2, cross_classification_2[[i,"Cross_classification"]], log = FALSE) * cross_classification_2[[i,"n"]],
+  dpois(3, cross_classification_2[[i,"Cross_classification"]], log = FALSE) * cross_classification_2[[i,"n"]],
+  dpois(4, cross_classification_2[[i,"Cross_classification"]], log = FALSE) * cross_classification_2[[i,"n"]],
+  ppois(4, cross_classification_2[[i,"Cross_classification"]], log = FALSE, lower.tail=FALSE) * cross_classification_2[[i,"n"]])
+
+estimations <- as_tibble(rbind(estimations,number_of_people))
+}
+colnames(estimations) <- index
+
+```
+```{r}
+estimation_sums <- estimations %>% select(-c("Income_group","Cars_truncated")) %>% summarise_all(sum)
+```
+
+```{r}
+estimation_sums
+```
+
+```{r}
+barplot(height=as.numeric(estimation_sums), names=colnames(estimation_sums), col="green")
+```
+
+
+
+```{r}
 MSE = mean(cross_classification_2$error^2)
 MAD = mean(abs(cross_classification_2$error))
 MAPE = mean(abs(cross_classification_2$error/cross_classification_2$Trips) * 100)
 evaluation <- data.frame(MSE,MAD,MAPE)
 evaluation
+```
+# Section 4: Multinomial logit model
+
+Written in the word
+
+
+
+
+
+# Section 5: Applied multinomial logit model
+*Apply the estimated model in 4) to the data*
+
+*a) Based on the estimated parameters, predict the total number of trips for the data.*
+For that, utility functions are obtained as follows:
+```{r}
+V0=0
+V1=-0.011*data_ex1$Age
+V1=-0.919+V1
+V2=(0.001*data_ex1$Income+-0.011*data_ex1$Age+-0.586*data_ex1$Male)
+V2=1.440+V2
+V3=(0.001*data_ex1$Income+-0.018*data_ex1$Age+-0.586*data_ex1$Male+0.213*data_ex1$Cars)
+V3=0.232+V3
+V4=(0.001*data_ex1$Income+-0.018*data_ex1$Age+-0.586*data_ex1$Male+0.213*data_ex1$Cars)
+V4=1.011+V4
+V5=(0.002*data_ex1$Income+-0.018*data_ex1$Age+-0.586*data_ex1$Male+0.213*data_ex1$Cars)
+V5=0.812+V5
+```
+
+And, afterwards, choice probabilities are calculated:
+```{r}
+data_ex1$logit_0=exp(V0)/(exp(V1)+exp(V2)+exp(V3)+exp(V4)+exp(V5)+exp(V0))
+data_ex1$logit_1=exp(V1)/(exp(V0)+exp(V2)+exp(V3)+exp(V4)+exp(V5)+exp(V1))
+data_ex1$logit_2=exp(V2)/(exp(V1)+exp(V0)+exp(V3)+exp(V4)+exp(V5)+exp(V2))
+data_ex1$logit_3=exp(V3)/(exp(V1)+exp(V2)+exp(V0)+exp(V4)+exp(V5)+exp(V3))
+data_ex1$logit_4=exp(V4)/(exp(V1)+exp(V2)+exp(V3)+exp(V0)+exp(V5)+exp(V4))
+data_ex1$logit_5=exp(V5)/(exp(V1)+exp(V2)+exp(V3)+exp(V4)+exp(V0)+exp(V5))
+```
+
+```{r}
+data_ex1$logit_0+data_ex1$logit_1+data_ex1$logit_2+data_ex1$logit_3+data_ex1$logit_4+data_ex1$logit_5
+```
+
+To get the average number of trips, choice probabilities are multipled by choice number of trips:
+
+```{r}
+data_ex1$Estimation=data_ex1$logit_0*0+data_ex1$logit_1*1+data_ex1$logit_2*2+data_ex1$logit_3*3+data_ex1$logit_4*4+data_ex1$logit_5*5
+
+(mean(data_ex1$Estimation))*1000
+```
+All the predicted trips are included in data_ex1$Estimation vector, and the mean of number of trips is 2.82.
+
+*b) Analyse the expected number of individuals with 0,1,2,3,4,5+ trips based on your model. Compare to the sample shares*
+
+The expected number of individuals with 0,1,2,3,4,5+ trips based on the model are:
+
+
+```{r}
+number_of_people <- c(
+  mean(data_ex1$logit_0)*1000,
+  mean(data_ex1$logit_1)*1000,
+  mean(data_ex1$logit_2)*1000,
+  mean(data_ex1$logit_3)*1000,
+  mean(data_ex1$logit_4)*1000,
+  mean(data_ex1$logit_5)*1000
+  
+)
+number_of_trips <- c("0","1","2","3","4","5+")
+estimations <- as_tibble(rbind(number_of_people))
+colnames(estimations) <- number_of_trips
+estimations
+```
+
+```{r}
+barplot(height=as.numeric(estimations), names=colnames(estimations), col="blue")
+```
+
+
+```{r}
+sum(number_of_people_log)
+```
+The number of the samples were:
+
+```{r}
+hist(data_ex1$Trips1, breaks=0:5, labels=TRUE, ylim=c(0,350))
+```
+The number of trips predicted by Logit model is not similar to the sample number of trips, except from 4 an 5+ trips.
+
+*c) In addition, simulate the total number of trips when income is increased by 20%. Based on this simulation, calculate the elasticity of the total number of trips with respect to income.*
+
+* External question
+```{r}
+data_ex2=data.frame(data_ex1$Income*1.2,data_ex1$Cars,data_ex1$Age,data_ex1$Male,data_ex1$Trips1)
+names(data_ex2)[names(data_ex2) == "data_ex1.Income...1.2"] <- "Income"
+names(data_ex2)[names(data_ex2) == "data_ex1.Cars"] <- "Cars"
+names(data_ex2)[names(data_ex2) == "data_ex1.Age"] <- "Age"
+names(data_ex2)[names(data_ex2) == "data_ex1.Male"] <- "Male"
+names(data_ex2)[names(data_ex2) == "data_ex1.Trips1"] <- "Trips1"
+```
+
+```{r}
+V0=0
+V1=-0.011*data_ex2$Age
+V1=-0.919+V1
+V2=(0.001*data_ex2$Income+-0.011*data_ex2$Age+-0.586*data_ex2$Male)
+V2=1.440+V2
+V3=(0.001*data_ex2$Income+-0.018*data_ex2$Age+-0.586*data_ex2$Male+0.213*data_ex2$Cars)
+V3=0.232+V3
+V4=(0.001*data_ex2$Income+-0.018*data_ex2$Age+-0.586*data_ex2$Male+0.213*data_ex2$Cars)
+V4=1.011+V4
+V5=(0.002*data_ex2$Income+-0.018*data_ex2$Age+-0.586*data_ex2$Male+0.213*data_ex2$Cars)
+V5=0.812+V5
+```
+
+```{r}
+data_ex2$logit_0=exp(V0)/(exp(V1)+exp(V2)+exp(V3)+exp(V4)+exp(V5)+exp(V0))
+data_ex2$logit_1=exp(V1)/(exp(V0)+exp(V2)+exp(V3)+exp(V4)+exp(V5)+exp(V1))
+data_ex2$logit_2=exp(V2)/(exp(V1)+exp(V0)+exp(V3)+exp(V4)+exp(V5)+exp(V2))
+data_ex2$logit_3=exp(V3)/(exp(V1)+exp(V2)+exp(V0)+exp(V4)+exp(V5)+exp(V3))
+data_ex2$logit_4=exp(V4)/(exp(V1)+exp(V2)+exp(V3)+exp(V0)+exp(V5)+exp(V4))
+data_ex2$logit_5=exp(V5)/(exp(V1)+exp(V2)+exp(V3)+exp(V4)+exp(V0)+exp(V5))
+```
+
+```{r}
+data_ex2$Estimation=data_ex2$logit_0*0+data_ex2$logit_1*1+data_ex2$logit_2*2+data_ex2$logit_3*3+data_ex2$logit_4*4+data_ex2$logit_5*5
+
+```
+
+```{r}
+number_of_people_log_1 <- c(
+  mean(data_ex2$logit_0)*1000,
+  mean(data_ex2$logit_1)*1000,
+  mean(data_ex2$logit_2)*1000,
+  mean(data_ex2$logit_3)*1000,
+  mean(data_ex2$logit_4)*1000,
+  mean(data_ex2$logit_5)*1000
+)
+number_of_people_log_1
+```
+
+
+
+# Section 6: Difference between Logit and Poisson
+
+*Discuss the difference between results from the logit and the Poisson model.*
+```{r}
+number_of_people <- c(
+  dpois(0, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(1, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(2, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(3, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  dpois(4, mean(data_ex1$poisson_results), log = FALSE) * 1000,
+  ppois(4, mean(data_ex1$poisson_results), log = FALSE, lower.tail=FALSE) * 1000)
+number_of_people
+```
+```{r}
+sum(number_of_people)
+```
+
+
+```{r}
+number_of_people_log <- c(
+  mean(data_ex1$logit_0)*1000,
+  mean(data_ex1$logit_1)*1000,
+  mean(data_ex1$logit_2)*1000,
+  mean(data_ex1$logit_3)*1000,
+  mean(data_ex1$logit_4)*1000,
+  mean(data_ex1$logit_5)*1000
+)
+number_of_people_log
+
+
+```
+
+
+Exercise 2
+
+```{r}
+data_ex3 <- read_excel("data/Distribution_data_pf2.xlsx")
+```
+
+```{r}
+cost_function <- lm(log(t_ij)~c_ij,data=data_ex3)
+cost_function
+```
+
+
+```{r}
+plot(cost_function)
+```
+```{r}
+library(olsrr)
+```
+```{r}
+ols_plot_resid_lev(cost_function)
+```
+```{r}
+ols_plot_dffits(cost_function)
+```
+```{r}
+ols_plot_dfbetas(cost_function)
+```
+```{r}
+ols_plot_resid_fit(cost_function)
 ```
 

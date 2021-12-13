@@ -33,9 +33,10 @@ fav_df <- rbind(
   favstats(data_ex2$beltsc),
   favstats(data_ex2$beltpr),
   favstats(data_ex2$zerotol),
-  favstats(data_ex2$alr)
+  favstats(data_ex2$alr),
+  favstats(data_ex2$fatal)
 )
-row.names(fav_df) <- c("ln(population)", "unemployment rate", "speed limit 65", "graduated driver license law", "Blood alcohol < 0.08 law", "Secondary seat belt law", "Primary seat belt law", "Zero tolerance alcohol law", "License revocation law")
+row.names(fav_df) <- c("ln(population)", "unemployment rate", "speed limit 65", "graduated driver license law", "Blood alcohol < 0.08 law", "Secondary seat belt law", "Primary seat belt law", "Zero tolerance alcohol law", "License revocation law", "fatalities")
 fav_df <- fav_df  %>% round(digits=2)
 fav_df
 ```
@@ -45,7 +46,7 @@ corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 
 ```{r}
 library(corrplot)
-corr_matrix <- data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr)) %>% cor()
+corr_matrix <- data_ex2 %>% select(c(lnpop, unempl, sp65, gdl, bac08, beltsc, beltpr, zerotol, alr, fatal)) %>% cor()
 round(corr_matrix, digits=3)
 corrplot(corr_matrix, method = 'ellipse', order = 'AOE', type = 'upper')
 ```
@@ -93,7 +94,7 @@ This p-value represents the amount of evidence supporting the null-hypothesis th
 So it seems that some of the additional variables *gdl, Zerotol and Alr* are significant at explaining the amount of variance. The variable that jumps out as most interesting to explore is alr, as it has the highest estimated effect. If we look at the correlation matrix we also see that it is positively correlated with the other two variables *zerotol* and *gdl*. So we try to reconstruct the extended model:
 
 ```{r}
-poisson_extended <- glm(fatal ~ lnpop + unempl + sp65 + gdl + bac08 + beltsc + beltpr + zerotol + alr, data=data_ex2, family=poisson(link="log"))
+poisson_extended <- glm(fatal ~ lnpop + unempl + sp65 + bac08 + beltsc + beltpr, data=data_ex2, family=poisson(link="log"))
 summary(poisson_extended)
 ```
 And we create the simple model, but this time with *alr* included:
@@ -112,8 +113,8 @@ lrtest(poisson_extended, poisson_simple_alr)
 Now we have some evidence supporting the null-hypothesis at a significance-level of 0.10. We cannot reject the null-hypothesis that these two models are similar.
 
 ```{r}
-data_ex2$elasticity_lnpop=poisson_extended$coefficients['lnpop']
-data_ex2$elasticity_unempl=data_ex2$unempl*poisson_extended$coefficients['unempl']
+data_ex2$elasticity_lnpop=0.78
+data_ex2$elasticity_unempl=data_ex2$unempl*-0.09
 
 fav_df <- rbind(
   favstats(data_ex2$elasticity_lnpop),
@@ -123,6 +124,20 @@ row.names(fav_df) <- c("ln(population)", "unemployment rate")
 fav_df <- fav_df  %>% round(digits=3)
 fav_df
 ```
+```{r}
+df2 <- data_ex2
+model3 <- -5.62 + 0.78*data_ex2$lnpop - 0.09*data_ex2$unempl - 0.35*data_ex2$sp65 - 0.09*data_ex2$bac08 - 0.21*data_ex2$beltpr - 0.21*data_ex2$beltsc
+model3_nosp65 <- -5.62 + 0.78*data_ex2$lnpop - 0.09*data_ex2$unempl - 0.09*data_ex2$bac08 - 0.21*data_ex2$beltpr - 0.21*data_ex2$beltsc
+model3_nobac08 <- -5.62 + 0.78*data_ex2$lnpop - 0.09*data_ex2$unempl - 0.35*data_ex2$sp65 - 0.21*data_ex2$beltpr - 0.21*data_ex2$beltsc
+model3_nobeltpr <- -5.62 + 0.78*data_ex2$lnpop - 0.09*data_ex2$unempl - 0.35*data_ex2$sp65 - 0.09*data_ex2$bac08 - 0.21*data_ex2$beltsc
+
+marginal_effect_sp65 <- exp(-0.35)-1
+marginal_effect_bac08 <- exp(-0.09)-1
+marginal_effect_nobeltpr <- exp(-0.21)-1
+c(marginal_effect_sp65, marginal_effect_bac08, marginal_effect_nobeltpr)
+```
+
+
 
 ```{r}
 res <- resid(poisson_extended)
@@ -133,14 +148,9 @@ qqline(res)
 plot(density(res))
 ```
 ```{r}
-ols_plot_cooksd_chart(poisson_extended)
-```
-```{r}
 plot(poisson_extended)
 ```
-```{r}
-plot(cooks.distance(poisson_extended), type="h")
-```
+
 ```{r}
 plot(poisson_extended, which = 4)
 ```
@@ -165,12 +175,12 @@ text(x=1:length(df), y=df, labels=ifelse(df<(-0.4), names(df),""), col="red", po
 ```{r}
 plot_dfbetas <- function(model){
   dfbts <- dfbetas(model)
-  #par(mfrow=c(ncol(dfbetas)%/%2 + ncol(dfbetas)%%2,2))
-  for (x in colnames(dfbetas)){
-    plot(dfbetas[,x], ylab=x)
-    abline(h = 4/sqrt(nrow(dfbetas)), col = "red")
-    abline(h = -4/sqrt(nrow(dfbetas)), col="red")
-    text(names(dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))]), dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))], labels=names(dfbetas[,x][abs(dfbetas[,x]) > 4/sqrt(nrow(dfbetas))]),  cex=0.9, font=2)
+  #par(mfrow=c(ncol(dfbts)%/%2 + ncol(dfbts)%%2,2))
+  for (x in colnames(dfbts)){
+    plot(dfbts[,x], ylab=x)
+    abline(h = 4/sqrt(nrow(dfbts)), col = "red")
+    abline(h = -4/sqrt(nrow(dfbts)), col="red")
+    text(names(dfbts[,x][abs(dfbts[,x]) > 4/sqrt(nrow(dfbts))]), dfbts[,x][abs(dfbts[,x]) > 4/sqrt(nrow(dfbts))], labels=names(dfbts[,x][abs(dfbts[,x]) > 4/sqrt(nrow(dfbts))]),  cex=0.9, font=2)
   }
 }
   
@@ -180,7 +190,9 @@ plot_dfbetas <- function(model){
 ```{r}
 plot_dfbetas(poisson_extended)
 ```
+
 ```{r}
+dfbetas <- dfbetas(poisson_extended)
 dfbetas <- as_tibble(dfbetas)
 medians <- cbind(
   median(dfbetas$`(Intercept)`),
@@ -198,9 +210,9 @@ colnames(medians) <- colnames(dfbetas)
 
 dfbetas_infl <- rbind(
   medians,
-  dfbetas %>% slice(812,811,807,80)
+  dfbetas %>% slice(807,812, 811)
 )
-rownames(dfbetas_infl) <- c("median",812,811,807,80)
+rownames(dfbetas_infl) <- c("median",807,812,811)
 dfbetas_infl
   
 ```

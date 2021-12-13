@@ -11,6 +11,7 @@ output:
 library(tidyverse)
 library(mosaic)
 library(readxl)
+library(ggrepel)
 
 ```
 ```{r}
@@ -233,6 +234,11 @@ var.test(model_ln_b, model_ln_c, alternative = "two.sided")
 Results: true ratio of variances is not equal to 1, p-value < 2.2e-16 (95%)
 
 OUR BEST MODEL IS model_ln_c
+```{r}
+data_ex1$prediction <- exp(predict(model_ln_c, data_ex1))
+```
+
+
 # --------------------- Section E -----------------------------
 *Calculate the average elasticity of VKMS with respect to household income and mass transit supply. Interpret the elasticity that you find.*
 
@@ -293,5 +299,25 @@ plot(density(res))
 ```
 ```{r}
 ols_plot_cooksd_bar(model_ln_c)
+```
+```{r}
+g <- ols_plot_resid_lev(model_ln_c)
+```
+```{r}
+ g$data %>%
+    arrange(desc(leverage)) %>%
+    slice(1:10) 
+```
+Observation 3631, 1629, 1950 and 1750 are high leverage outliers
+```{r}
+ols_plot_dffits(model_ln_c)
+```
+```{r}
+ols_plot_dfbetas(model_ln_c)
+```
+
+
+```{r}
+data_ex1 %>% filter(ID == 3631 |ID == 1629 |ID == 1950 |ID == 1750) %>% select(c("ID","VKMS","prediction","Children", "Car", "HHIncome", "Worker","CityShape", "RoadDens", "TransSup"))
 ```
 

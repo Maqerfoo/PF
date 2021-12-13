@@ -1,0 +1,235 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(readxl)
+library(tidyverse)
+```
+
+```{r}
+df <- read_xlsx('data/PFIII_ex1_2020_data.xlsx')
+```
+
+
+```{r}
+LL_1 <- -4271.1
+LL_2 <- -4257.4
+k <- 5
+AIC_1 <- 2 * k - 2 * LL_1
+AIC_2 <- 2 * k - 2 * LL_2
+
+rho_2 <- 1 - (LL_2/LL_1)
+```
+
+Based on the estimated parameters, calculate the individual probabilities for each alternative in each observation. Compute the market shares for each mode in the base situation and compare to the observed market shares.
+
+```{r}
+alpha <- -0.4489316
+beta <- -0.0267934
+v1 <- alpha*log(df$TC1) + beta*df$TT1
+v2 <- 0.1097849 + alpha*log(df$TC2) + beta*df$TT2
+v4 <- 1.3413546 + alpha*log(df$TC4) + beta*df$TT4
+v6 <- -0.7295991 + alpha*log(df$TC6) + beta*df$TT6
+```
+
+```{r}
+df$prob_1 <- exp(v1) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df$prob_2 <- exp(v2) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df$prob_4 <- exp(v4) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df$prob_6 <- exp(v6) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+estimations <- data.frame("trips"=c(mean(df$prob_1)*4197, mean(df$prob_2)*4197, mean(df$prob_4)*4197, mean(df$prob_6)*4197), "mode"=c("walk","bike","car","public transport"))
+```
+
+```{r}
+sum(estimations$trips)
+```
+
+#Create better histograms
+
+```{r}
+table(df$choice)
+```
+
+
+
+```{r}
+barplot(height=rle(sort(df$choice))$lengths, names=estimations$mode, col="cyan3")
+```
+
+```{r}
+barplot(height=estimations$trips, names=estimations$mode, col="lightslateblue")
+```
+```{r}
+#create dataframe
+barframe <- data.frame("trips"=c(estimations$trips, rle(sort(df$choice))$lengths), "mode"=rep(estimations$mode,2), "method"=rep(c("model","empirical"), each=4))
+
+# Modify data for Base R barplot
+barframe <- reshape(barframe,                        
+                     idvar = "method",
+                     timevar = "mode",
+                     direction = "wide")
+row.names(barframe) <- barframe$method
+barframe <- barframe[ , 2:ncol(barframe)]
+colnames(barframe) <- estimations$mode
+barframe <- as.matrix(barframe)
+
+# Grouped barplot using Base R
+barplot(height = barframe, beside = TRUE, col=c("lightslateblue", "cyan3"))
+legend(1,2000, legend=c("model","empirical"), fill=c("lightslateblue", "cyan3"))                 
+```
+
+
+
+```{r}
+df$VOT <- beta / (alpha/df$TravelCost)
+mean(df$VOT)
+```
+```{r}
+df <- df %>% mutate(prob = if_else(choice == 1, prob_1,
+                           if_else(choice == 2, prob_2,
+                           if_else(choice == 4, prob_4,
+                           if_else(choice == 6, prob_6, NA_real_)))))
+```
+
+
+
+```{r}
+df$elasticity_cost_direct <- alpha*df$TravelCost*(1-df$prob)*df$prob
+df$elasticity_cost_cross <- -alpha*df$TravelCost*df$prob*df$prob
+mean(df$elasticity_cost_direct)
+mean(df$elasticity_cost_cross)
+```
+
+```{r}
+df$elasticity_time_direct <- beta*(1-df$prob)*df$prob
+df$elasticity_time_cross <- -beta*df$prob*df$prob
+mean(df$elasticity_time_direct)
+mean(df$elasticity_time_cross)
+```
+
+Now, you would like to investigate whether there is a difference in preferences for using public
+transport between male and female respondents. Make a cross table presenting how the market
+shares are split across gender.
+In the output presented below, the interaction variable Ptfem has been included, which is only
+one in the public transport alternative and only if the user is female:
+
+```{r}
+df_fem=df
+df_fem$Gender=df_fem$Gender-1
+```
+
+
+```{r}
+alpha <- -0.4747656
+beta <- -0.0263811
+c=0.9936726
+v1 <- alpha*log(df_fem$TC1) + beta*df_fem$TT1+c*df_fem$Gender
+v2 <- 0.1323373 + alpha*log(df_fem$TC2) + beta*df_fem$TT2+c*df_fem$Gender
+v4 <- 1.4104197 + alpha*log(df_fem$TC4) + beta*df_fem$TT4+c*df_fem$Gender
+v6 <- -1.2657003 + alpha*log(df_fem$TC6) + beta*df_fem$TT6+c*df_fem$Gender
+```
+
+
+```{r}
+df_fem$prob_1 <- exp(v1) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df_fem$prob_2 <- exp(v2) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df_fem$prob_4 <- exp(v4) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+df_fem$prob_6 <- exp(v6) / (exp(v1) + exp(v2) + exp(v4) + exp(v6))
+```
+
+
+```{r}
+mode_1_estimation_fem <- mean(df$prob_1) * 4197
+mode_2_estimation_fem <- mean(df$prob_2) * 4197
+mode_4_estimation_fem <- mean(df$prob_4) * 4197
+mode_6_estimation_fem <- mean(df$prob_6) * 4197
+```
+
+
+
+```{r}
+df_fem=filter(df, Gender==2)
+df_male=filter(df, Gender==1)
+```
+
+
+```{r}
+p1 <- hist(df_fem$choice)                   
+p2 <- hist(df_male$choice)                     
+plot( p1, col=rgb(0,0,1,1/4)) 
+plot( p2, col=rgb(1,0,0,1/4), add=T)
+```
+
+
+```{r}
+LL_1 <- -4240.9
+LL_3 <- -4241.5
+LL_4 <- -4237.4
+AIC_1 <- 2 * 7 - 2 * LL_1
+AIC_3 <- 2 * 7 - 2 * LL_3
+AIC_4 <- 2 * 8 - 2 * LL_4
+c(AIC_1,AIC_3,AIC_4)
+```
+We find the lowest AIC value for model 4. This is a nesting structure with *car* and *walking* in one nest and *bike* and *public transport* in the other. 
+
+```{r}
+df <- read_xlsx('data/PFIII_ex2_2020_data.xlsx')
+df$Gender <- df$Gender - 1
+```
+
+
+First we find the utility functions
+```{r}
+coef_time <- -0.0205695
+coef_logcost <- -0.3153978
+coef_fem <- 0.7133131
+coef_nest_bikepub <- 0.6319911
+coef_nest_carwalk <- 0.7340071
+v1 <- coef_time*df$TT1 + coef_logcost*df$TC1 + coef_fem*df$Gender 
+v2 <- -0.1822955 + coef_time*df$TT2 + coef_logcost*df$TC2 + coef_fem*df$Gender
+v4 <- 0.9418312 + coef_time*df$TT4 + coef_logcost*df$TC4 + coef_fem*df$Gender 
+v6 <- -1.1596390 + coef_time*df$TT6 + coef_logcost*df$TC6 + coef_fem*df$Gender 
+```
+
+Then we calculate the within-nest probabilities. This time we have to divide the utility functions with the nest coefficients.
+```{r}
+logsum_carwalk <- (exp(v1/coef_nest_carwalk) + exp(v4/coef_nest_carwalk))
+logsum_bikepub <- (exp(v2/coef_nest_bikepub) + exp(v6/coef_nest_bikepub))
+df$prob_1_conditional <- exp(v1/coef_nest_carwalk) / logsum_carwalk
+df$prob_4_conditional <- exp(v4/coef_nest_carwalk) / logsum_carwalk
+mean(df$prob_1 + df$prob_4)
+
+df$prob_2_conditional <- exp(v2/coef_nest_bikepub) / logsum_bikepub
+df$prob_6_conditional <- exp(v6/coef_nest_bikepub) / logsum_bikepub
+mean(df$prob_2_conditional + df$prob_6_conditional)
+```
+
+Then we calculate the probability of choosing a nest
+```{r}
+df$nestprob_carwalk <- exp(coef_nest_carwalk * log(logsum_carwalk)) / (exp(coef_nest_carwalk * log(logsum_carwalk)) + exp(coef_nest_bikepub * log(logsum_bikepub)))
+
+df$nestprob_bikepub <- exp(coef_nest_bikepub * log(logsum_bikepub)) / (exp(coef_nest_carwalk * log(logsum_carwalk)) + exp(coef_nest_bikepub * log(logsum_bikepub)))
+mean(df$nestprob_bikepub + df$nestprob_carwalk)
+```
+
+And the overall probabilities of choosing one option becomes the within nest probability multiplied by the probability of choosing the nest.
+```{r}
+df$prob_1 <- df$prob_1_conditional * df$nestprob_carwalk
+df$prob_4 <- df$prob_4_conditional * df$nestprob_carwalk
+
+df$prob_2 <- df$prob_2_conditional * df$nestprob_bikepub
+df$prob_6 <- df$prob_6_conditional * df$nestprob_bikepub
+mean(df$prob_1 + df$prob_2 + df$prob_4 + df$prob_6)
+```
+
+
+
