@@ -11,7 +11,6 @@ library(mosaic)
 
 ```{r}
 df <- read_xlsx('data/labtown_2020data.xlsx')
-od <- read_xlsx('data/labtown_od.xlsx')
 ```
 ```{r}
 datalist = list()
@@ -27,11 +26,11 @@ fav_df
 
 Conditional utilities, all conditioned on destination
 ```{r}
-df$v_walk <- 1.49936144786925 - 0.12*60*(df$Dist/6) #6km/h 
-df$v_bike <- 2.00813319212073 - 0.12*60*(df$Dist/12) #12km/h
-df$v_car <- 0.493233143126145 - 0.05*df$cc - 0.06*df$ct + 1*df$CarStat
-df$v_carp <- -0.684616198063556 - 0.1*df$ct
-df$v_pub <- 0.220200561302239 - 0.05*df$pc - 0.05*df$pt - 0.03*df$ae
+df$v_walk <- 1.5 - 0.12*60*(df$Dist/6) #6km/h 
+df$v_bike <- 2 - 0.12*60*(df$Dist/12) #12km/h
+df$v_car <- 0.5 - 0.05*df$cc - 0.06*df$ct + 1*df$CarStat
+df$v_carp <- -0.5 - 0.1*df$ct
+df$v_pub <- -0.05*df$pc - 0.05*df$pt - 0.03*df$ae
 ```
 
 
@@ -107,10 +106,26 @@ df$marketshare_pub <- df$jointprob_pub * df$PopResi*0.5
 ```
 
 ```{r}
+sum_people <- sum(df$marketshare_walk,df$marketshare_bike,df$marketshare_car ,df$marketshare_carp,df$marketshare_pub )
+MS_est <- c(
+sum(df$marketshare_walk)/sum_people,
+sum(df$marketshare_bike)/sum_people,
+sum(df$marketshare_car)/sum_people,
+sum(df$marketshare_carp)/sum_people,
+sum(df$marketshare_pub)/sum_people)
+MS_est
+```
+
+
+
+```{r}
 df %>% select(starts_with("marketshare")) %>% sum()
 ```
 ```{r}
 (sum(df$PopDest)/20)*0.5
+```
+```{r}
+c(sum(df$marketshare_walk), sum(df$marketshare_bike), sum(df$marketshare_car), sum(df$marketshare_carp), sum(df$marketshare_pub))
 ```
 
 
@@ -119,16 +134,123 @@ barplot(height=c(sum(df$marketshare_walk), sum(df$marketshare_bike), sum(df$mark
 ```
 
 
+
+```{r}
+
+calculate_ms <- function(asc){
+
+df$v_walk <- asc[1] - 0.12*60*(df$Dist/6) #6km/h 
+df$v_bike <- asc[2] - 0.12*60*(df$Dist/12) #12km/h
+df$v_car <-  asc[3] - 0.05*df$cc - 0.06*df$ct + 1*df$CarStat
+df$v_carp <- asc[4]  - 0.1*df$ct
+df$v_pub <-  asc[5] - 0.05*df$pc - 0.05*df$pt - 0.03*df$ae
+
+#conditional probabilities
+datalist = list()
+for (i in unique(df$ResiZone)){
+  df_tmp <- filter(df,ResiZone == i)
+  logsum_mode <- (exp(df_tmp$v_walk) + exp(df_tmp$v_bike) + exp(df_tmp$v_car) + exp(df_tmp$v_carp) + exp(df_tmp$v_pub))
+  df_tmp$prob_walk <- exp(df_tmp$v_walk) / (logsum_mode)
+  df_tmp$prob_bike <- exp(df_tmp$v_bike) / (logsum_mode)
+  df_tmp$prob_car <- exp(df_tmp$v_car) / (logsum_mode)
+  df_tmp$prob_carp <- exp(df_tmp$v_carp) / (logsum_mode)
+  df_tmp$prob_pub <- exp(df_tmp$v_pub) / (logsum_mode)
+  datalist[[i]] <- df_tmp
+}
+df <- do.call(rbind, datalist)
+
+#utility of destination
+df$v_dest <- 1*log(df$EmpDest + 0.15*df$PopDest)
+#probability of destination
+datalist = list()
+for (i in unique(df$ResiZone)){
+  df_tmp <- filter(df,ResiZone == i)
+  logsum_mode <- log(exp(df_tmp$v_walk) + exp(df_tmp$v_bike) + exp(df_tmp$v_car) + exp(df_tmp$v_carp) + exp(df_tmp$v_pub))
+  df_tmp$prob_dest <- exp(df_tmp$v_dest + 0.7*logsum_mode) / sum(exp(df_tmp$v_dest + 0.7*logsum_mode))
+  datalist[[i]] <- df_tmp
+}
+df <- do.call(rbind, datalist)
+
+
+#joint probabilities
+datalist = list()
+for (i in unique(df$ResiZone)){
+  df_tmp <- filter(df,ResiZone == i)
+  df_tmp$jointprob_walk <- df_tmp$prob_walk * df_tmp$prob_dest 
+  df_tmp$jointprob_bike <- df_tmp$prob_bike * df_tmp$prob_dest 
+  df_tmp$jointprob_car <- df_tmp$prob_car * df_tmp$prob_dest 
+  df_tmp$jointprob_carp <- df_tmp$prob_carp * df_tmp$prob_dest
+  df_tmp$jointprob_pub <- df_tmp$prob_pub * df_tmp$prob_dest
+  datalist[[i]] <- df_tmp
+}
+df <- do.call(rbind, datalist)
+
+
+df$marketshare_walk <- df$jointprob_walk * df$PopResi*0.5
+df$marketshare_bike <- df$jointprob_bike * df$PopResi*0.5
+df$marketshare_car <- df$jointprob_car * df$PopResi*0.5
+df$marketshare_carp <- df$jointprob_carp * df$PopResi*0.5
+df$marketshare_pub <- df$jointprob_pub * df$PopResi*0.5
+
+sum_people <- sum(df$marketshare_walk,df$marketshare_bike,df$marketshare_car ,df$marketshare_carp,df$marketshare_pub )
+MS_est <- c(sum(df$marketshare_walk)/sum_people,
+sum(df$marketshare_bike)/sum_people,
+sum(df$marketshare_car)/sum_people,
+sum(df$marketshare_carp)/sum_people,
+sum(df$marketshare_pub)/sum_people)
+
+return(MS_est)
+}
+
+calibrate_ms <- function(MS_est,MS_given,asc){
+  asc[1] <- asc[1] + log(MS_given[1]/MS_est[1])
+  asc[2] <- asc[2] + log(MS_given[2]/MS_est[2])
+  asc[3] <- asc[3] + log(MS_given[3]/MS_est[3])
+  asc[4] <- asc[4] + log(MS_given[4]/MS_est[4])
+  asc[5] <- asc[5] + log(MS_given[5]/MS_est[5])
+  return(asc)
+}
+
+```
+
+```{r}
+MS_est
+```
+
+
+```{r} 
+asc <- c(1.5 , 2 , 0.5 , -0.5 , 0)
+MS_given <- c(0.04,0.142,0.623,0.088,0.106)
+asc <- calibrate_ms(MS_est,MS_given,asc)
+asc
+
+```
+```{r}
+MS_est <- calculate_ms(asc)
+MS_est
+```
+
+
+
 Exercise 2, task 1
+
+```{r}
+barplot(height=c(sum(od$trip_w), sum(od$trip_b), sum(od$trip_c), sum(od$trip_cp), sum(od$trip_p)), names=c("walk", "bike", "car", "carp", "pub"), col="purple")
+```
+```{r}
+od <- read_xlsx('data/labtown_od.xlsx')
+
+```
+
 
 ```{r}
 df$pc_new <- 10
 
-df$v_walk <- 1.49936144786925 - 0.12*60*(df$Dist/6) #6km/h 
-df$v_bike <- 2.00813319212073 - 0.12*60*(df$Dist/12) #12km/h
-df$v_car <- 0.493233143126145 - 0.05*df$cc - 0.06*df$ct + 1*df$CarStat
-df$v_carp <- -0.684616198063556 - 0.1*df$ct
-df$v_pub <- 0.220200561302239 - 0.05*df$pc_new - 0.05*df$pt - 0.03*df$ae
+df$v_walk <- 1.5 - 0.12*60*(df$Dist/6) #6km/h 
+df$v_bike <- 2 - 0.12*60*(df$Dist/12) #12km/h
+df$v_car <- 0.5 - 0.05*df$cc - 0.06*df$ct + 1*df$CarStat
+df$v_carp <- -0.5 - 0.1*df$ct
+df$v_pub <- - 0.05*df$pc_new - 0.05*df$pt - 0.03*df$ae
 
 datalist = list()
 for (i in unique(df$ResiZone)){
@@ -183,6 +305,7 @@ relchange_bike <- sum(df$marketshare_bike_sc) / sum(df$marketshare_bike)
 relchange_car <- sum(df$marketshare_car_sc) / sum(df$marketshare_car)
 relchange_carp <- sum(df$marketshare_carp_sc) / sum(df$marketshare_carp)
 relchange_pub <- sum(df$marketshare_pub_sc) / sum(df$marketshare_pub)
+c(relchange_walk,relchange_bike,relchange_car ,relchange_carp,relchange_pub)
 ```
 
 ```{r}
@@ -204,9 +327,7 @@ sum(od$trip_w_sc + od$trip_b_sc + od$trip_c_sc + od$trip_cp_sc + od$trip_p_sc)*0
 ```{r}
 barplot(height=c(sum(od$trip_w_sc)*0.5, sum(od$trip_b_sc)*0.5, sum(od$trip_c_sc)*0.5, sum(od$trip_cp_sc)*0.5, sum(od$trip_p_sc)*0.5), names=c("walk", "bike", "car", "carp", "pub"), col="red")
 ```
-```{r}
-sum(c(sum(od$trip_w_sc)*0.5, sum(od$trip_b_sc)*0.5, sum(od$trip_c_sc)*0.5, sum(od$trip_cp_sc)*0.5, sum(od$trip_p_sc)*0.5))
-```
+
 ```{r}
 SVTT <- 70
 GTC_pub_0 <- df$pc + SVTT*(df$pt/60) + 1.5*SVTT*(df$ae/60)
@@ -216,10 +337,25 @@ consumer_surplus_pub <- 0.5*(od$trip_p + od$trip_p_sc)*(GTC_pub_0 - GTC_pub_1)
 ticket_revenue_base <- df$pc * od$trip_p
 ticket_revenue_sc <- 10 * od$trip_p_sc
 
-barplot(height=c(sum(consumer_surplus_pub), sum(ticket_revenue_base - ticket_revenue_sc)), names=c("consumer surplus", "lost ticket revenue"), col="grey")
+barplot(height=c(352081.3, 114668.8), names=c("consumer surplus", "lost ticket revenue"), col="grey")
 
 ```
 ```{r}
+barplot(height=c(401458.8, 119563.8), names=c("consumer surplus", "lost ticket revenue"), col="green")
+```
+
+
+
+```{r}
 sum(consumer_surplus_pub) - sum(ticket_revenue_base - ticket_revenue_sc)
+```
+```{r}
+sum(consumer_surplus_pub)
+```
+```{r}
+sum(ticket_revenue_sc - ticket_revenue_base)
+```
+```{r}
+1-relchange_car
 ```
 
