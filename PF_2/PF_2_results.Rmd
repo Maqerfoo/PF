@@ -206,6 +206,39 @@ cross_classification <- data_ex1%>%
   summarise(Trips = sum(Trips1), n=n(), avg_trips=Trips/n)
 cross_classification
 ```
+```{r}
+index <- c("Income_group","Cars_truncated","0","1","2","3","4","5+")
+estimations = data.frame(matrix(vector(), 0, length(index),
+                dimnames=list(c(), index)))
+
+for (i in 1:nrow(cross_classification)){
+  number_of_people <- c(
+  cross_classification[[i,"Income_group"]],
+  cross_classification[[i,"Cars_truncated"]],
+  dpois(0, cross_classification[[i,"avg_trips"]], log = FALSE) * cross_classification[[i,"n"]],
+  dpois(1, cross_classification[[i,"avg_trips"]], log = FALSE) * cross_classification[[i,"n"]],
+  dpois(2, cross_classification[[i,"avg_trips"]], log = FALSE) * cross_classification[[i,"n"]],
+  dpois(3, cross_classification[[i,"avg_trips"]], log = FALSE) * cross_classification[[i,"n"]],
+  dpois(4, cross_classification[[i,"avg_trips"]], log = FALSE) * cross_classification[[i,"n"]],
+  ppois(4, cross_classification[[i,"avg_trips"]], log = FALSE, lower.tail=FALSE) * cross_classification[[i,"n"]])
+
+estimations <- as_tibble(rbind(estimations,number_of_people))
+}
+colnames(estimations) <- index
+estimations
+```
+
+```{r}
+sum(estimations$`1` + estimations$`2`*2 + estimations$`3`*3 + estimations$`4`*4 + estimations$`5+`*5)/sum(cross_classification_2$n)
+```
+```{r}
+estimation_sums <- estimations %>% select(-c("Income_group","Cars_truncated")) %>% summarise_all(sum)
+estimation_sums
+```
+
+```{r}
+barplot(height=as.numeric(estimation_sums), names=colnames(estimation_sums), col="orange")
+```
 
 
 ```{r}
@@ -237,7 +270,11 @@ cross_classification_2$Cars_truncated <- summary_sc$Cars_truncated
 cross_classification_2$error <- cross_classification_2$Trips-cross_classification_2$Cross_classification_trips
 cross_classification_2
 ```
-We can calculate the error-terms MSE, MAD and MAPE.
+```{r}
+mean(cross_classification_2$Cross_classification_trips / cross_classification_2$n)
+```
+
+
 
 ```{r}
 index <- c("Income_group","Cars_truncated","0","1","2","3","4","5+")
@@ -260,11 +297,14 @@ estimations <- as_tibble(rbind(estimations,number_of_people))
 colnames(estimations) <- index
 
 ```
-```{r}
-estimation_sums <- estimations %>% select(-c("Income_group","Cars_truncated")) %>% summarise_all(sum)
-```
 
 ```{r}
+sum(estimations$`1` + estimations$`2`*2 + estimations$`3`*3 + estimations$`4`*4 + estimations$`5+`*5)/sum(cross_classification_2$n)
+```
+
+
+```{r}
+estimation_sums <- estimations %>% select(-c("Income_group","Cars_truncated")) %>% summarise_all(sum)
 estimation_sums
 ```
 
@@ -357,9 +397,6 @@ barplot(height=as.numeric(estimations), names=colnames(estimations), col="blue")
 ```
 
 
-```{r}
-sum(number_of_people_log)
-```
 The number of the samples were:
 
 ```{r}
